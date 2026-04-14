@@ -19,6 +19,9 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY data/few_shot_examples.json ./data/few_shot_examples.json
+COPY eval ./eval
+COPY scripts ./scripts
 
 EXPOSE 8080
 

@@ -1,0 +1,104 @@
+{
+  "examples": [
+    {
+      "id": "last_email_raw",
+      "mode": "generate",
+      "output_format": "raw_lua",
+      "tags": ["generate", "raw_lua", "last_element", "wf_vars", "has_context"],
+      "paths": ["wf.vars.emails"],
+      "prompt": "Из полученного списка email получи последний.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"emails\": [\"user1@example.com\", \"user2@example.com\", \"user3@example.com\"]\n    }\n  }\n}",
+      "output": "return wf.vars.emails[#wf.vars.emails]"
+    },
+    {
+      "id": "increment_json",
+      "mode": "generate",
+      "output_format": "json_with_lua_fields",
+      "tags": ["generate", "json_with_lua_fields", "increment", "wf_vars", "has_context"],
+      "paths": ["wf.vars.try_count_n"],
+      "prompt": "Увеличивай значение переменной try_count_n на каждой итерации.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"try_count_n\": 3\n    }\n  }\n}",
+      "output": "{\"try_count_n\":\"lua{return wf.vars.try_count_n + 1}lua\"}"
+    },
+    {
+      "id": "cleanup_restbody_json",
+      "mode": "generate",
+      "output_format": "json_with_lua_fields",
+      "tags": ["generate", "json_with_lua_fields", "cleanup", "restbody", "has_context"],
+      "paths": ["wf.vars.RESTbody.result"],
+      "prompt": "Для полученных данных из предыдущего REST запроса очисти значения переменных ID, ENTITY_ID, CALL.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"RESTbody\": {\n        \"result\": [{\"ID\": 1, \"ENTITY_ID\": 2, \"CALL\": \"x\", \"OTHER\": \"y\"}]\n      }\n    }\n  }\n}",
+      "output": "{\"result\":\"lua{result = wf.vars.RESTbody.result; for _, filteredEntry in pairs(result) do for key, value in pairs(filteredEntry) do if key ~= 'ID' and key ~= 'ENTITY_ID' and key ~= 'CALL' then filteredEntry[key] = nil end end end return result}lua\"}"
+    },
+    {
+      "id": "iso8601_raw",
+      "mode": "generate",
+      "output_format": "raw_lua",
+      "tags": ["generate", "raw_lua", "iso8601", "date_time", "has_context"],
+      "paths": ["wf.vars.json.IDOC.ZCDF_HEAD.DATUM", "wf.vars.json.IDOC.ZCDF_HEAD.TIME"],
+      "prompt": "Преобразуй время из формата YYYYMMDD и HHMMSS в строку ISO 8601.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"json\": {\n        \"IDOC\": {\n          \"ZCDF_HEAD\": {\n            \"DATUM\": \"20231015\",\n            \"TIME\": \"153000\"\n          }\n        }\n      }\n    }\n  }\n}",
+      "output": "DATUM = wf.vars.json.IDOC.ZCDF_HEAD.DATUM\nTIME = wf.vars.json.IDOC.ZCDF_HEAD.TIME\nlocal function safe_sub(str, start, finish)\n local s = string.sub(str, start, math.min(finish, #str))\n return s ~= \"\" and s or \"00\"\nend\nyear = safe_sub(DATUM, 1, 4)\nmonth = safe_sub(DATUM, 5, 6)\nday = safe_sub(DATUM, 7, 8)\nhour = safe_sub(TIME, 1, 2)\nminute = safe_sub(TIME, 3, 4)\nsecond = safe_sub(TIME, 5, 6)\niso_date = string.format('%s-%s-%sT%s:%s:%s.00000Z', year, month, day, hour, minute, second)\nreturn iso_date"
+    },
+    {
+      "id": "ensure_arrays_raw",
+      "mode": "generate",
+      "output_format": "raw_lua",
+      "tags": ["generate", "raw_lua", "ensure_arrays", "has_context"],
+      "paths": ["wf.vars.json.IDOC.ZCDF_HEAD.ZCDF_PACKAGES"],
+      "prompt": "Сделай так, чтобы все items в ZCDF_PACKAGES всегда были массивами.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"json\": {\n        \"IDOC\": {\n          \"ZCDF_HEAD\": {\n            \"ZCDF_PACKAGES\": [{\"items\": {\"sku\": \"C\"}}]\n          }\n        }\n      }\n    }\n  }\n}",
+      "output": "function ensureArray(t)\n if type(t) ~= \"table\" then\n  return {t}\n end\n local isArray = true\n for k, v in pairs(t) do\n  if type(k) ~= \"number\" or math.floor(k) ~= k then\n   isArray = false\n   break\n  end\n end\n return isArray and t or {t}\nend\nfunction ensureAllItemsAreArrays(objectsArray)\n if type(objectsArray) ~= \"table\" then\n  return objectsArray\n end\n for _, obj in ipairs(objectsArray) do\n  if type(obj) == \"table\" and obj.items then\n   obj.items = ensureArray(obj.items)\n  end\n end\n return objectsArray\nend\nreturn ensureAllItemsAreArrays(wf.vars.json.IDOC.ZCDF_HEAD.ZCDF_PACKAGES)"
+    },
+    {
+      "id": "filter_discount_raw",
+      "mode": "generate",
+      "output_format": "raw_lua",
+      "tags": ["generate", "raw_lua", "discount_markdown_filter", "has_context"],
+      "paths": ["wf.vars.parsedCsv"],
+      "prompt": "Отфильтруй элементы из массива, чтобы включить только те, у которых есть значения в полях Discount или Markdown.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"parsedCsv\": [{\"Discount\": \"10%\", \"Markdown\": \"\"}, {\"Discount\": \"\", \"Markdown\": null}]\n    }\n  }\n}",
+      "output": "local result = _utils.array.new()\nlocal items = wf.vars.parsedCsv\nfor _, item in ipairs(items) do\n if (item.Discount ~= \"\" and item.Discount ~= nil) or (item.Markdown ~= \"\" and item.Markdown ~= nil) then\n  table.insert(result, item)\n end\nend\nreturn result"
+    },
+    {
+      "id": "square_patch_json",
+      "mode": "modify",
+      "output_format": "json_with_lua_fields",
+      "tags": ["modify", "json_with_lua_fields", "square_patch", "has_existing_code"],
+      "paths": [],
+      "prompt": "Доработай код и добавь поле squared.",
+      "existing_code": "{\"num\":\"lua{return tonumber('5')}lua\"}",
+      "output": "{\"num\":\"lua{return tonumber('5')}lua\",\"squared\":\"lua{local n = tonumber('5'); return n * n}lua\"}"
+    },
+    {
+      "id": "unix_time_json",
+      "mode": "generate",
+      "output_format": "json_with_lua_fields",
+      "tags": ["generate", "json_with_lua_fields", "unix_time", "wf_init_variables", "has_context"],
+      "paths": ["wf.initVariables.recallTime"],
+      "prompt": "Конвертируй время в переменной recallTime в unix-формат.",
+      "context": "{\n  \"wf\": {\n    \"initVariables\": {\n      \"recallTime\": \"2023-10-15T15:30:00+00:00\"\n    }\n  }\n}",
+      "output": "{\"unix_time\":\"lua{local iso_time = wf.initVariables.recallTime\\nlocal days_in_month = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}\\nif not iso_time or not iso_time:match(\\\"^%d%d%d%d%-%d%d%-%d%dT\\\") then\\n return nil\\nend\\nlocal function is_leap_year(year)\\n return (year % 4 == 0 and year % 100 ~= 0) or (year % 400 == 0)\\nend\\nlocal function days_since_epoch(year, month, day)\\n local days = 0\\n for y = 1970, year - 1 do\\n  days = days + (is_leap_year(y) and 366 or 365)\\n end\\n for m = 1, month - 1 do\\n  days = days + days_in_month[m]\\n  if m == 2 and is_leap_year(year) then\\n   days = days + 1\\n  end\\n end\\n days = days + (day - 1)\\n return days\\nend\\nlocal function parse_iso8601_to_epoch(iso_str)\\n local year, month, day, hour, min, sec, ms, offset_sign, offset_hour, offset_min =\\n  iso_str:match(\\\"(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)%.(%d+)([+-])(%d+):(%d+)\\\")\\n if not year then\\n  year, month, day, hour, min, sec, offset_sign, offset_hour, offset_min =\\n   iso_str:match(\\\"(%d+)-(%d+)-(%d+)T(%d+):(%d+):(%d+)([+-])(%d+):(%d+)\\\")\\n  ms = 0\\n end\\n year = tonumber(year); month = tonumber(month); day = tonumber(day)\\n hour = tonumber(hour); min = tonumber(min); sec = tonumber(sec)\\n offset_hour = tonumber(offset_hour); offset_min = tonumber(offset_min)\\n local total_days = days_since_epoch(year, month, day)\\n local total_seconds = total_days * 86400 + hour * 3600 + min * 60 + sec\\n local offset_seconds = offset_hour * 3600 + offset_min * 60\\n if offset_sign == '-' then\\n  offset_seconds = -offset_seconds\\n end\\n return total_seconds - offset_seconds\\nend\\nlocal epoch_seconds = parse_iso8601_to_epoch(iso_time)\\nreturn epoch_seconds}lua\"}"
+    },
+    {
+      "id": "lowcode_increment_fragment",
+      "mode": "generate",
+      "output_format": "lowcode_lua_fragment",
+      "tags": ["generate", "lowcode_lua_fragment", "increment", "lowcode_fragment", "has_context"],
+      "paths": ["wf.vars.try_count_n"],
+      "prompt": "Сформируй low-code фрагмент, который увеличивает try_count_n на 1.",
+      "context": "{\n  \"wf\": {\n    \"vars\": {\n      \"try_count_n\": 3\n    }\n  }\n}",
+      "output": "lua{return wf.vars.try_count_n + 1}lua"
+    },
+    {
+      "id": "modify_double_total_raw",
+      "mode": "modify",
+      "output_format": "raw_lua",
+      "tags": ["modify", "raw_lua", "has_existing_code"],
+      "paths": ["wf.vars.total"],
+      "prompt": "Измени код так, чтобы он возвращал удвоенное значение total.",
+      "existing_code": "return wf.vars.total",
+      "output": "local value = wf.vars.total\nreturn value * 2"
+    }
+  ]
+}

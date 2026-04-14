@@ -1,0 +1,126 @@
+{
+  "cases": [
+    {
+      "id": "last_shipment_id_raw_init",
+      "title": "Последний shipment id из initVariables",
+      "source": "Synthetic templates v1",
+      "target_output_format": "raw_lua",
+      "prompt": "Из массива shipmentIds в initVariables верни последний shipment id.\n{\n  \"wf\": {\n    \"initVariables\": {\n      \"shipmentIds\": [\n        \"SHP-01\",\n        \"SHP-02\",\n        \"SHP-03\",\n        \"SHP-04\"\n      ]\n    }\n  }\n}",
+      "required_regexes": [
+        "return\\s+wf\\.initVariables\\.shipmentIds\\s*\\[\\s*#wf\\.initVariables\\.shipmentIds\\s*\\]"
+      ]
+    },
+    {
+      "id": "latest_invoice_json_en",
+      "title": "Latest invoice code in JSON",
+      "source": "Synthetic templates v1",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Build field latestInvoiceCode from the last element of invoiceCodes.\n{\n  \"wf\": {\n    \"vars\": {\n      \"invoiceCodes\": [\n        \"INV-001\",\n        \"INV-002\",\n        \"INV-003\"\n      ]\n    }\n  }\n}",
+      "required_regexes": [
+        "\"latestInvoiceCode\"\\s*:",
+        "wf\\.vars\\.invoiceCodes\\s*\\[\\s*#wf\\.vars\\.invoiceCodes\\s*\\]"
+      ]
+    },
+    {
+      "id": "increment_fail_count_raw_en",
+      "title": "Increment failCount raw",
+      "source": "Synthetic templates v1",
+      "target_output_format": "raw_lua",
+      "prompt": "Increment variable failCount by 1 and return the next value.\n{\n  \"wf\": {\n    \"vars\": {\n      \"failCount\": 2\n    }\n  }\n}",
+      "required_regexes": [
+        "return\\s+wf\\.vars\\.failCount\\s*\\+\\s*1"
+      ]
+    },
+    {
+      "id": "increment_reprocess_json_ru",
+      "title": "Инкремент reprocess_count в JSON",
+      "source": "Synthetic templates v1",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Увеличивай значение переменной reprocess_count на каждой итерации и верни результат в поле reprocess_count.\n{\n  \"wf\": {\n    \"vars\": {\n      \"reprocess_count\": 4\n    }\n  }\n}",
+      "required_regexes": [
+        "\"reprocess_count\"\\s*:",
+        "wf\\.vars\\.reprocess_count\\s*\\+\\s*1"
+      ]
+    },
+    {
+      "id": "cleanup_rows_json_en",
+      "title": "Cleanup payload with English instruction",
+      "source": "Synthetic templates v1",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "For the previous REST response clear values in fields ORDER_ID, STATE, COMMENT and remove every other key.\n{\n  \"wf\": {\n    \"vars\": {\n      \"RESTbody\": {\n        \"result\": [\n          {\n            \"ORDER_ID\": \"O-1001\",\n            \"STATE\": \"created\",\n            \"COMMENT\": \"ok\",\n            \"AMOUNT\": \"500\",\n            \"CURRENCY\": \"USD\"\n          },\n          {\n            \"ORDER_ID\": \"O-1002\",\n            \"STATE\": \"failed\",\n            \"COMMENT\": \"retry\",\n            \"ERROR_CODE\": \"E17\",\n            \"DETAILS\": \"network\"\n          }\n        ]\n      }\n    }\n  }\n}",
+      "required_regexes": [
+        "\"result\"\\s*:",
+        "wf\\.vars\\.RESTbody\\.result",
+        "key\\s*~=\\s*[\"\\']ORDER_ID[\"\\']",
+        "key\\s*~=\\s*[\"\\']STATE[\"\\']",
+        "key\\s*~=\\s*[\"\\']COMMENT[\"\\']",
+        "filteredEntry\\s*\\[\\s*key\\s*\\]\\s*=\\s*nil"
+      ]
+    },
+    {
+      "id": "iso_8601_noisy_raw",
+      "title": "ISO 8601 with noisy context",
+      "source": "Synthetic templates v1",
+      "target_output_format": "raw_lua",
+      "prompt": "Convert DATUM and TIME into an ISO 8601 string using Lua.\n{\n  \"wf\": {\n    \"vars\": {\n      \"json\": {\n        \"IDOC\": {\n          \"ZCDF_HEAD\": {\n            \"DATUM\": \"20261130\",\n            \"TIME\": \"235959\",\n            \"STATUS\": \"READY\",\n            \"ROUTE\": \"Night line\"\n          }\n        }\n      },\n      \"meta\": {\n        \"traceId\": \"T-900\"\n      }\n    }\n  }\n}",
+      "required_regexes": [
+        "wf\\.vars\\.json\\.IDOC\\.ZCDF_HEAD\\.DATUM",
+        "wf\\.vars\\.json\\.IDOC\\.ZCDF_HEAD\\.TIME",
+        "string\\.format\\(",
+        "\\.00000Z"
+      ]
+    },
+    {
+      "id": "ensure_items_arrays_noisy_raw",
+      "title": "Ensure items arrays with noisy payload",
+      "source": "Synthetic templates v1",
+      "target_output_format": "raw_lua",
+      "prompt": "Как преобразовать структуру данных так, чтобы все элементы items в ZCDF_PACKAGES всегда были представлены в виде массивов, даже если они изначально не являются массивами?\n{\n  \"wf\": {\n    \"vars\": {\n      \"json\": {\n        \"IDOC\": {\n          \"ZCDF_HEAD\": {\n            \"ZCDF_PACKAGES\": [\n              {\n                \"id\": \"P1\",\n                \"items\": [\n                  {\n                    \"sku\": \"A1\"\n                  }\n                ]\n              },\n              {\n                \"id\": \"P2\",\n                \"items\": {\n                  \"sku\": \"A2\"\n                }\n              },\n              {\n                \"id\": \"P3\",\n                \"items\": {\n                  \"sku\": \"A3\",\n                  \"qty\": 4\n                }\n              }\n            ],\n            \"DELIVERY\": \"D-100\"\n          }\n        }\n      }\n    }\n  }\n}",
+      "required_regexes": [
+        "function\\s+ensureArray",
+        "type\\(t\\)\\s*~=\\s*[\\\"']table[\\\"']",
+        "math\\.floor\\(k\\)\\s*~=\\\\s*k|math\\.floor\\(k\\)\\s*~=\\s*k",
+        "obj\\.items\\s*=\\s*ensureArray\\(obj\\.items\\)",
+        "return\\s+ensureAllItemsAreArrays\\(wf\\.vars\\.json\\.IDOC\\.ZCDF_HEAD\\.ZCDF_PACKAGES\\)"
+      ]
+    },
+    {
+      "id": "filter_bonus_fragment_v2",
+      "title": "LowCode fragment for Bonus or PromoPrice filter",
+      "source": "Synthetic templates v2",
+      "target_output_format": "lowcode_lua_fragment",
+      "prompt": "Сформируй LowCode fragment, который фильтрует catalogRows и оставляет только элементы с заполненными полями Bonus или PromoPrice.\n{\n  \"wf\": {\n    \"vars\": {\n      \"catalogRows\": [\n        {\n          \"SKU\": \"B001\",\n          \"Bonus\": \"yes\",\n          \"PromoPrice\": \"\"\n        },\n        {\n          \"SKU\": \"B002\",\n          \"Bonus\": \"\",\n          \"PromoPrice\": \"799\"\n        },\n        {\n          \"SKU\": \"B003\",\n          \"Bonus\": null,\n          \"PromoPrice\": null\n        },\n        {\n          \"SKU\": \"B004\",\n          \"Bonus\": \"\",\n          \"PromoPrice\": \"\"\n        }\n      ]\n    }\n  }\n}",
+      "required_regexes": [
+        "^lua\\{[\\s\\S]*\\}lua$",
+        "(_utils\\.array\\.new\\(\\)|table\\.remove\\()",
+        "wf\\.vars\\.catalogRows",
+        "(table\\.insert\\(|table\\.remove\\()"
+      ]
+    },
+    {
+      "id": "square_twelve_json_en",
+      "title": "Square of number 12",
+      "source": "Synthetic templates v1",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Add a variable with the square of number 12 and keep the source value in field num.",
+      "required_regexes": [
+        "\"num\"\\s*:",
+        "\"squared\"\\s*:",
+        "(tonumber\\(['\\\"]12['\\\"]\\)|\\b12\\b)"
+      ]
+    },
+    {
+      "id": "unix_time_millis_json",
+      "title": "Unix time with milliseconds and offset",
+      "source": "Synthetic templates v1",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Конвертируй время в переменной recallTime в unix-формат.\n{\n  \"wf\": {\n    \"initVariables\": {\n      \"recallTime\": \"2024-07-01T08:15:30.123-05:00\"\n    }\n  }\n}",
+      "required_regexes": [
+        "\"unix_time\"\\s*:",
+        "wf\\.initVariables\\.recallTime",
+        "local\\s+function\\s+days_since_epoch",
+        "local\\s+function\\s+parse_iso8601_to_epoch"
+      ]
+    }
+  ]
+}

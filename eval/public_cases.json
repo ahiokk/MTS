@@ -1,0 +1,108 @@
+{
+  "cases": [
+    {
+      "id": "last_email_raw",
+      "title": "Последний элемент массива",
+      "source": "Публичная выборка LocalScript.pdf §2.1",
+      "target_output_format": "raw_lua",
+      "prompt": "Из полученного списка email получи последний.\n{\n  \"wf\": {\n    \"vars\": {\n      \"emails\": [\n        \"user1@example.com\",\n        \"user2@example.com\",\n        \"user3@example.com\"\n      ]\n    }\n  }\n}",
+      "required_regexes": [
+        "return\\s+wf\\.vars\\.emails\\s*\\[\\s*#wf\\.vars\\.emails\\s*\\]"
+      ]
+    },
+    {
+      "id": "try_count_json",
+      "title": "Счетчик попыток",
+      "source": "Публичная выборка LocalScript.pdf §2.2",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Увеличивай значение переменной try_count_n на каждой итерации\n{\n  \"wf\": {\n    \"vars\": {\n      \"try_count_n\": 3\n    }\n  }\n}",
+      "required_regexes": [
+        "\"try_count_n\"\\s*:",
+        "lua\\{",
+        "wf\\.vars\\.try_count_n\\s*\\+\\s*1"
+      ]
+    },
+    {
+      "id": "cleanup_restbody_json",
+      "title": "Очистка значений в переменных",
+      "source": "Публичная выборка LocalScript.pdf §2.3",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Для полученных данных из предыдущего REST запроса очисти значения переменных ID, ENTITY_ID, CALL.\n{\n  \"wf\": {\n    \"vars\": {\n      \"RESTbody\": {\n        \"result\": [\n          {\n            \"ID\": 123,\n            \"ENTITY_ID\": 456,\n            \"CALL\": \"example_call_1\",\n            \"OTHER_KEY_1\": \"value1\",\n            \"OTHER_KEY_2\": \"value2\"\n          },\n          {\n            \"ID\": 789,\n            \"ENTITY_ID\": 101,\n            \"CALL\": \"example_call_2\",\n            \"EXTRA_KEY_1\": \"value3\",\n            \"EXTRA_KEY_2\": \"value4\"\n          }\n        ]\n      }\n    }\n  }\n}",
+      "required_regexes": [
+        "\"result\"\\s*:",
+        "wf\\.vars\\.RESTbody\\.result",
+        "key\\s*~=\\s*[\"']ID[\"']",
+        "key\\s*~=\\s*[\"']ENTITY_ID[\"']",
+        "key\\s*~=\\s*[\"']CALL[\"']",
+        "filteredEntry\\s*\\[\\s*key\\s*\\]\\s*=\\s*nil"
+      ]
+    },
+    {
+      "id": "iso_8601_raw",
+      "title": "Приведение времени к ISO 8601",
+      "source": "Публичная выборка LocalScript.pdf §2.4",
+      "target_output_format": "raw_lua",
+      "prompt": "Преобразуй время из формата 'YYYYMMDD' и 'HHMMSS' в строку в формате ISO 8601 с использованием Lua.\n{\n  \"wf\": {\n    \"vars\": {\n      \"json\": {\n        \"IDOC\": {\n          \"ZCDF_HEAD\": {\n            \"DATUM\": \"20231015\",\n            \"TIME\": \"153000\"\n          }\n        }\n      }\n    }\n  }\n}",
+      "required_regexes": [
+        "wf\\.vars\\.json\\.IDOC\\.ZCDF_HEAD\\.DATUM",
+        "wf\\.vars\\.json\\.IDOC\\.ZCDF_HEAD\\.TIME",
+        "string\\.format\\("
+      ]
+    },
+    {
+      "id": "ensure_items_arrays_raw",
+      "title": "Проверка типа данных",
+      "source": "Публичная выборка LocalScript.pdf §2.5",
+      "target_output_format": "raw_lua",
+      "prompt": "Как преобразовать структуру данных так, чтобы все элементы items в ZCDF_PACKAGES всегда были представлены в виде массивов, даже если они изначально не являются массивами?\n{\n  \"wf\": {\n    \"vars\": {\n      \"json\": {\n        \"IDOC\": {\n          \"ZCDF_HEAD\": {\n            \"ZCDF_PACKAGES\": [\n              {\"items\": [{\"sku\": \"A\"}, {\"sku\": \"B\"}]},\n              {\"items\": {\"sku\": \"C\"}}\n            ]\n          }\n        }\n      }\n    }\n  }\n}",
+      "required_regexes": [
+        "function\\s+ensureArray",
+        "type\\(t\\)\\s*~=\\s*[\"']table[\"']",
+        "math\\.floor\\(k\\)\\s*~=\\s*k",
+        "obj\\.items\\s*=\\s*ensureArray\\(obj\\.items\\)",
+        "return\\s+ensureAllItemsAreArrays\\(wf\\.vars\\.json\\.IDOC\\.ZCDF_HEAD\\.ZCDF_PACKAGES\\)"
+      ]
+    },
+    {
+      "id": "filter_discount_raw",
+      "title": "Фильтрация элементов массива",
+      "source": "Публичная выборка LocalScript.pdf §2.6",
+      "target_output_format": "raw_lua",
+      "prompt": "Отфильтруй элементы из массива, чтобы включить только те, у которых есть значения в полях Discount или Markdown.\n{\n  \"wf\": {\n    \"vars\": {\n      \"parsedCsv\": [\n        {\"SKU\": \"A001\", \"Discount\": \"10%\", \"Markdown\": \"\"},\n        {\"SKU\": \"A002\", \"Discount\": \"\", \"Markdown\": \"5%\"},\n        {\"SKU\": \"A003\", \"Discount\": null, \"Markdown\": null},\n        {\"SKU\": \"A004\", \"Discount\": \"\", \"Markdown\": \"\"}\n      ]\n    }\n  }\n}",
+      "required_regexes": [
+        "_utils\\.array\\.new\\(\\)",
+        "wf\\.vars\\.parsedCsv",
+        "item\\.Discount\\s*~=\\s*[\"'][\"']\\s*and\\s*item\\.Discount\\s*~=\\s*nil",
+        "item\\.Markdown\\s*~=\\s*[\"'][\"']\\s*and\\s*item\\.Markdown\\s*~=\\s*nil",
+        "table\\.insert\\(",
+        "return\\s+result"
+      ]
+    },
+    {
+      "id": "square_patch_json",
+      "title": "Дополнение существующего кода",
+      "source": "Публичная выборка LocalScript.pdf §2.7",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Добавь переменную с квадратом числа.",
+      "required_regexes": [
+        "\"num\"\\s*:",
+        "\"squared\"\\s*:",
+        "tonumber\\([\"']5[\"']\\)",
+        "return\\s+n\\s*\\*\\s*n"
+      ]
+    },
+    {
+      "id": "unix_time_json",
+      "title": "Конвертация времени в unix",
+      "source": "Публичная выборка LocalScript.pdf §2.8",
+      "target_output_format": "json_with_lua_fields",
+      "prompt": "Конвертируй время в переменной recallTime в unix-формат.\n{\n  \"wf\": {\n    \"initVariables\": {\n      \"recallTime\": \"2023-10-15T15:30:00+00:00\"\n    }\n  }\n}",
+      "required_regexes": [
+        "\"unix_time\"\\s*:",
+        "wf\\.initVariables\\.recallTime",
+        "local\\s+function\\s+days_since_epoch",
+        "local\\s+function\\s+parse_iso8601_to_epoch"
+      ]
+    }
+  ]
+}

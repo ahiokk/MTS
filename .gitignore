@@ -1,4 +1,19 @@
 __pycache__/
-.venv/
-data/
+*.pyc
+*.pyo
+*.pyd
 
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+.env
+.env.*
+!.env.example
+
+.vscode/
+.idea/
+
+artifacts/
+Thumbs.db

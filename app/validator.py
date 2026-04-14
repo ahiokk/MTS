@@ -32,6 +32,24 @@ FORBIDDEN_WRAPPER_MARKERS = (
     "```",
 )
 
+FORBIDDEN_LUA_REGEX_RULES = (
+    (
+        r":[ \t]*(filter|map|reduce)\s*\(",
+        "unsupported_collection_method",
+        "Method-based collection helpers like :filter/:map/:reduce are not allowed.",
+    ),
+    (
+        r"\brequire\s*\(",
+        "external_module_forbidden",
+        "External modules via require(...) are not allowed in this runtime.",
+    ),
+    (
+        r"\bstring\.split\s*\(",
+        "unsupported_string_split",
+        "string.split(...) is not part of the allowed plain-Lua runtime.",
+    ),
+)
+
 
 def _make_issue(code: str, message: str, severity: str = "error") -> dict[str, str]:
     return {
@@ -246,6 +264,14 @@ def _check_expected_format(
         )
 
     stripped = output.strip()
+    if expected_output_format == "raw_lua" and ("lua{" in stripped or "}lua" in stripped):
+        issues.append(
+            _make_issue(
+                "raw_lua_contains_wrapper",
+                "raw_lua output must not contain lua{...}lua wrappers.",
+            )
+        )
+
     if expected_output_format == "lowcode_lua_fragment":
         if not (stripped.startswith("lua{") and stripped.endswith("}lua")):
             issues.append(
@@ -280,6 +306,10 @@ def _check_allowed_helpers(lua_source: str, issues: list[dict[str, str]]) -> Non
             )
         )
 
+    for pattern, code, message in FORBIDDEN_LUA_REGEX_RULES:
+        if re.search(pattern, lua_source, flags=re.IGNORECASE | re.MULTILINE):
+            issues.append(_make_issue(code, message))
+
 
 def _extract_or_field_pair(user_text: str) -> tuple[str, str] | None:
     patterns = (
@@ -295,9 +325,80 @@ def _extract_or_field_pair(user_text: str) -> tuple[str, str] | None:
     return None
 
 
-def _check_task_specific_rules(user_text: str, lua_source: str, issues: list[dict[str, str]]) -> None:
+def _instruction_prefix(user_text: str) -> str:
+    return user_text.split("{", 1)[0]
+
+
+def _extract_cleanup_keys(user_text: str) -> list[str]:
+    instruction = _instruction_prefix(user_text)
+    scope_match = re.search(
+        r"(?:переменных|fields?)\s+([^.\n]+)",
+        instruction,
+        flags=re.IGNORECASE,
+    )
+    scope = scope_match.group(1) if scope_match else instruction
+    candidates = re.findall(r"\b[A-Z][A-Z0-9_]+\b", scope)
+    # Сохраняем порядок появления, но убираем дубликаты.
+    unique_keys: list[str] = []
+    for item in candidates:
+        if item not in unique_keys:
+            unique_keys.append(item)
+    return unique_keys
+
+
+def _extract_variable_name(user_text: str) -> str | None:
+    instruction = _instruction_prefix(user_text)
+    patterns = (
+        r"переменн(?:ой|ую)\s+([A-Za-z_]\w*)",
+        r"variable\s+([A-Za-z_]\w*)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, instruction, flags=re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _check_task_specific_rules(
+    user_text: str,
+    lua_source: str,
+    output_artifact: str,
+    issues: list[dict[str, str]],
+) -> None:
     lowered_prompt = user_text.lower()
     lowered_code = lua_source.lower()
+    lowered_output = output_artifact.lower()
+
+    if (
+        "увелич" in lowered_prompt
+        or "increment" in lowered_prompt
+        or "следующее значение" in lowered_prompt
+        or "next value" in lowered_prompt
+    ):
+        variable_name = _extract_variable_name(user_text)
+        if "+ 1" not in lowered_code and "+1" not in lowered_code:
+            issues.append(
+                _make_issue(
+                    "missing_increment_logic",
+                    "Increment task should add 1 to the target variable.",
+                )
+            )
+
+        if variable_name and variable_name.lower() not in lowered_code:
+            issues.append(
+                _make_issue(
+                    "wrong_increment_target",
+                    f"Increment task should use the target variable {variable_name}.",
+                )
+            )
+
+    if re.search(r"return\s+function\b", lowered_code):
+        issues.append(
+            _make_issue(
+                "returned_function_object",
+                "Generated code returns a function object instead of the computed result.",
+            )
+        )
 
     # Для запросов с "или" хотим хотя бы грубую проверку на AND/OR,
     # чтобы ловить типичные семантические ошибки.
@@ -315,7 +416,6 @@ def _check_task_specific_rules(user_text: str, lua_source: str, issues: list[dic
                 _make_issue(
                     "weak_filter_implementation",
                     "Filtering task does not appear to build a result array explicitly.",
-                    severity="warning",
                 )
             )
 
@@ -364,6 +464,69 @@ def _check_task_specific_rules(user_text: str, lua_source: str, issues: list[dic
                         )
                     )
 
+    if "очист" in lowered_prompt or "clean" in lowered_prompt:
+        if " = nil" not in lowered_code or "pairs(" not in lowered_code:
+            issues.append(
+                _make_issue(
+                    "cleanup_logic_incomplete",
+                    "Cleanup task should iterate over entries and clear keys dynamically.",
+                )
+            )
+
+        if re.search(r"\[\d+\]\.[A-Za-z_]\w*", lua_source):
+            issues.append(
+                _make_issue(
+                    "hardcoded_index_patch",
+                    "Cleanup task should not hard-code array indices when transforming a collection.",
+                )
+            )
+
+        cleanup_keys = _extract_cleanup_keys(user_text)
+        missing_cleanup_keys = [
+            key
+            for key in cleanup_keys
+            if f"key ~= '{key.lower()}'" not in lowered_code
+            and f'key ~= "{key.lower()}"' not in lowered_code
+        ]
+        if missing_cleanup_keys:
+            issues.append(
+                _make_issue(
+                    "cleanup_keep_keys_missing",
+                    "Cleanup task should preserve the keys named in the prompt while clearing other keys.",
+                )
+            )
+
+    if "iso 8601" in lowered_prompt:
+        has_sub_logic = "safe_sub" in lowered_code or "string.sub" in lowered_code or ":sub(" in lowered_code
+        has_date_parts = all(
+            token in lowered_code
+            for token in ("year", "month", "day", "hour", "minute", "second")
+        )
+        if not (has_sub_logic and has_date_parts and "string.format" in lowered_code):
+            issues.append(
+                _make_issue(
+                    "iso8601_conversion_too_weak",
+                    "ISO 8601 conversion should split the incoming date and time into parts before formatting.",
+                )
+            )
+
+        if ".00000z" not in lowered_code:
+            issues.append(
+                _make_issue(
+                    "iso8601_suffix_missing",
+                    "ISO 8601 conversion should use the canonical .00000Z suffix.",
+                )
+            )
+
+    if "всегда были представлены в виде массивов" in lowered_prompt or "always were arrays" in lowered_prompt:
+        if "ensurearray" not in lowered_code and "math.floor(" not in lowered_code and "_utils.array.markasarray" not in lowered_code:
+            issues.append(
+                _make_issue(
+                    "array_normalization_too_weak",
+                    "Array-normalization task should explicitly normalize non-array tables.",
+                )
+            )
+
     if "последн" in lowered_prompt or "last" in lowered_prompt:
         if "#" not in lua_source:
             issues.append(
@@ -371,6 +534,45 @@ def _check_task_specific_rules(user_text: str, lua_source: str, issues: list[dic
                     "missing_last_element_pattern",
                     "Task asks for the last element, but code does not use a last-element access pattern.",
                     severity="warning",
+                )
+            )
+
+    if "квадрат" in lowered_prompt and "числ" in lowered_prompt:
+        if '"squared"' not in lowered_output:
+            issues.append(
+                _make_issue(
+                    "missing_squared_field",
+                    "Square task should return a field named squared in the final artifact.",
+                )
+            )
+
+    if "unix" in lowered_prompt and "recalltime" in lowered_prompt:
+        if '"unix_time"' not in lowered_output:
+            issues.append(
+                _make_issue(
+                    "missing_unix_time_field",
+                    "Unix-time task should use the canonical output field unix_time.",
+                )
+            )
+
+        if "os.time" in lowered_code:
+            issues.append(
+                _make_issue(
+                    "os_time_forbidden",
+                    "Unix-time conversion should not depend on os.time in this LowCode runtime.",
+                )
+            )
+
+        if (
+            "days_since_epoch" not in lowered_code
+            or "parse_iso8601_to_epoch" not in lowered_code
+            or "days_in_month" not in lowered_code
+            or "is_leap_year" not in lowered_code
+        ):
+            issues.append(
+                _make_issue(
+                    "unix_conversion_too_weak",
+                    "Unix-time conversion should be implemented with explicit pure-Lua parsing logic.",
                 )
             )
 
@@ -404,7 +606,7 @@ def validate_lua(
     combined_lua_source = "\n\n".join(lua_snippets)
     if combined_lua_source:
         _check_allowed_helpers(combined_lua_source, issues)
-        _check_task_specific_rules(user_text, combined_lua_source, issues)
+        _check_task_specific_rules(user_text, combined_lua_source, normalized_output, issues)
 
     syntax = _run_lua_syntax_check(lua_snippets)
     if syntax["supported"] and syntax["ok"] is False:
